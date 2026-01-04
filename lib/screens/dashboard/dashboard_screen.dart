@@ -5,6 +5,10 @@ import '../../providers/auth_provider.dart';
 import '../../providers/residence_provider.dart';
 import '../../providers/activity_provider.dart';
 import '../../providers/marketplace_provider.dart';
+import '../../providers/transaction_provider.dart'; // 🆕 IMPORT
+import '../transaction/my_transactions_screen.dart'; // 🆕 IMPORT
+import '../transaction/incoming_orders_screen.dart'; // 🆕 IMPORT
+import '../bookmark/my_bookmarks_screen.dart'; // Import existing
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -25,6 +29,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final residenceProvider = context.read<ResidenceProvider>();
     final activityProvider = context.read<ActivityProvider>();
     final marketplaceProvider = context.read<MarketplaceProvider>();
+    final transactionProvider = context.read<TransactionProvider>(); // 🆕
+    final authProvider = context.read<AuthProvider>();
 
     if (residenceProvider.residences.isEmpty) {
       await residenceProvider.fetchResidences();
@@ -34,6 +40,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (marketplaceProvider.products.isEmpty) {
       await marketplaceProvider.fetchProducts();
+    }
+
+    // 🆕 Load transactions based on role
+    if (authProvider.user != null) {
+      if (authProvider.isProvider) {
+        await transactionProvider.fetchIncomingOrders(authProvider.user!.id);
+      } else {
+        await transactionProvider.fetchMyTransactions(authProvider.user!.id);
+      }
     }
   }
 
@@ -73,48 +88,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const SizedBox(height: 24),
 
       // Stats Cards
-      Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              'Booking',
-              '0',
-              Icons.home_work,
-              AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              'Kegiatan',
-              '0',
-              Icons.event,
-              AppColors.activityPrimary,
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      Row(
-        children: [
-          Expanded(
-            child: _buildStatCard(
-              'Transaksi',
-              '0',
-              Icons.shopping_bag,
-              AppColors.marketplacePrimary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildStatCard(
-              'Bookmark',
-              '0',
-              Icons.bookmark,
-              AppColors.secondary,
-            ),
-          ),
-        ],
+      Consumer2<TransactionProvider, AuthProvider>(
+        builder: (context, transactionProvider, authProvider, _) {
+          // Get transaction count
+          final transactionCount = transactionProvider.transactions.length;
+          final pendingCount = transactionProvider.getCountByStatus('pending');
+
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      'Booking',
+                      '0',
+                      Icons.home_work,
+                      AppColors.primary,
+                      onTap: null, // Belum ada screen
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      'Kegiatan',
+                      '0',
+                      Icons.event,
+                      AppColors.activityPrimary,
+                      onTap: null, // Belum ada screen
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  // 🆕 CLICKABLE - Transaksi Card
+                  Expanded(
+                    child: _buildStatCard(
+                      'Transaksi',
+                      transactionCount.toString(),
+                      Icons.shopping_bag,
+                      AppColors.marketplacePrimary,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MyTransactionsScreen(),
+                          ),
+                        );
+                      },
+                      badge: pendingCount > 0 ? pendingCount.toString() : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 🆕 CLICKABLE - Bookmark Card
+                  Expanded(
+                    child: _buildStatCard(
+                      'Bookmark',
+                      '0',
+                      Icons.bookmark,
+                      AppColors.secondary,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MyBookmarksScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
 
       const SizedBox(height: 24),
@@ -146,9 +194,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const SizedBox(height: 24),
 
       // Stats Cards with REAL DATA
-      Consumer3<ResidenceProvider, ActivityProvider, MarketplaceProvider>(
+      Consumer4<ResidenceProvider, ActivityProvider, MarketplaceProvider,
+          TransactionProvider>(
         builder: (context, residenceProvider, activityProvider,
-            marketplaceProvider, _) {
+            marketplaceProvider, transactionProvider, _) {
           final userId = context.read<AuthProvider>().user?.id ?? 0;
 
           // Filter by provider ID
@@ -162,6 +211,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               .where((p) => p.sellerId == userId)
               .length;
 
+          // 🆕 Get incoming orders count
+          final incomingOrdersCount = transactionProvider.transactions.length;
+          final pendingOrdersCount =
+              transactionProvider.getCountByStatus('pending');
+
           return Column(
             children: [
               Row(
@@ -172,6 +226,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       myResidences.toString(),
                       Icons.home_work,
                       AppColors.primary,
+                      onTap: null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -181,6 +236,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       myActivities.toString(),
                       Icons.event,
                       AppColors.activityPrimary,
+                      onTap: null,
                     ),
                   ),
                 ],
@@ -194,15 +250,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       myProducts.toString(),
                       Icons.store,
                       AppColors.marketplacePrimary,
+                      onTap: null,
                     ),
                   ),
                   const SizedBox(width: 12),
+                  // 🆕 CLICKABLE - Pesanan Masuk Card
                   Expanded(
                     child: _buildStatCard(
-                      'Booking',
-                      '0',
-                      Icons.list_alt,
+                      'Pesanan',
+                      incomingOrdersCount.toString(),
+                      Icons.inbox,
                       AppColors.secondary,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const IncomingOrdersScreen(),
+                          ),
+                        );
+                      },
+                      badge: pendingOrdersCount > 0
+                          ? pendingOrdersCount.toString()
+                          : null,
                     ),
                   ),
                 ],
@@ -232,14 +301,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     String title,
     String value,
     IconData icon,
-    Color color,
-  ) {
-    return Container(
+    Color color, {
+    VoidCallback? onTap, // 🆕 Optional tap handler
+    String? badge, // 🆕 Optional badge (untuk pending count)
+  }) {
+    final card = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.greyLight),
+        border: Border.all(
+          color: onTap != null
+              ? color.withValues(alpha: 0.3)
+              : AppColors.greyLight,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -248,41 +323,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              size: 24,
-              color: color,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  size: 24,
+                  color: color,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+          // 🆕 Badge untuk pending count
+          if (badge != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  badge,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
+          // 🆕 Visual indicator untuk clickable card
+          if (onTap != null)
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Icon(
+                Icons.arrow_forward_ios,
+                size: 12,
+                color: color.withValues(alpha: 0.5),
+              ),
             ),
-          ),
         ],
       ),
     );
+
+    // 🆕 Wrap dengan InkWell jika ada onTap
+    if (onTap != null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: card,
+        ),
+      );
+    }
+
+    return card;
   }
 
   Widget _buildEmptyState() {

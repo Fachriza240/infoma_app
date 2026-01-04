@@ -9,6 +9,7 @@ import 'marketplace_form_screen.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../providers/bookmark_provider.dart';
+import '../../providers/transaction_provider.dart';  
 
 class MarketplaceDetailScreen extends StatefulWidget {
   final int productId;
@@ -706,47 +707,247 @@ class _MarketplaceDetailScreenState extends State<MarketplaceDetailScreen> {
     );
   }
 
-  void _showPurchaseDialog(BuildContext context, product) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Beli Produk'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Anda akan membeli:'),
-            const SizedBox(height: 8),
-            Text(
-              product.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+void _showPurchaseDialog(BuildContext context, product) {
+  final quantityController = TextEditingController(text: '1');
+  int quantity = 1;
+  double totalPrice = product.price;
+
+  showDialog(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setDialogState) {
+        return AlertDialog(
+          title: const Text('Beli Produk'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Product Info
+                Text(
+                  product.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Kondisi: ${product.condition}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Stok tersedia: ${product.stockQuantity}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: product.stockQuantity > 5 
+                        ? Colors.green 
+                        : Colors.orange,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Divider(height: 24),
+                
+                // Quantity Input
+                const Text(
+                  'Jumlah',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    // Minus Button
+                    IconButton(
+                      onPressed: quantity > 1
+                          ? () {
+                              setDialogState(() {
+                                quantity--;
+                                quantityController.text = quantity.toString();
+                                totalPrice = product.price * quantity;
+                              });
+                            }
+                          : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                      color: AppColors.primary,
+                    ),
+                    
+                    // Quantity TextField
+                    Expanded(
+                      child: TextField(
+                        controller: quantityController,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          final parsedValue = int.tryParse(value);
+                          if (parsedValue != null && 
+                              parsedValue > 0 && 
+                              parsedValue <= product.stockQuantity) {
+                            setDialogState(() {
+                              quantity = parsedValue;
+                              totalPrice = product.price * quantity;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                    
+                    // Plus Button
+                    IconButton(
+                      onPressed: quantity < product.stockQuantity
+                          ? () {
+                              setDialogState(() {
+                                quantity++;
+                                quantityController.text = quantity.toString();
+                                totalPrice = product.price * quantity;
+                              });
+                            }
+                          : null,
+                      icon: const Icon(Icons.add_circle_outline),
+                      color: AppColors.primary,
+                    ),
+                  ],
+                ),
+                
+                // Validation Message
+                if (quantity > product.stockQuantity) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '⚠️ Jumlah melebihi stok yang tersedia',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.red[700],
+                    ),
+                  ),
+                ],
+                
+                const Divider(height: 24),
+                
+                // Price Summary
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Harga per item',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      Helpers.formatCurrency(product.price),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total Harga',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      Helpers.formatCurrency(totalPrice),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text('Harga: ${Helpers.formatCurrency(product.price)}'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            Consumer2<AuthProvider, TransactionProvider>(
+              builder: (context, auth, transactionProvider, child) {
+                // Validate
+                final isValid = quantity > 0 && 
+                                quantity <= product.stockQuantity;
+                
+                return ElevatedButton(
+                  onPressed: isValid
+                      ? () async {
+                          // Close dialog
+                          Navigator.pop(context);
+                          
+                          // Show loading
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Memproses pembelian...'),
+                              duration: Duration(seconds: 1),
+                              backgroundColor: Colors.blue,
+                            ),
+                          );
+                          
+                          // Create transaction
+                          final success = await transactionProvider.createTransaction(
+                            productId: product.id!,
+                            buyerId: auth.user!.id,
+                            sellerId: product.sellerId,
+                            quantity: quantity,
+                            totalPrice: totalPrice,
+                          );
+                          
+                          if (context.mounted) {
+                            if (success) {
+                              // Success
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('✅ Pembelian berhasil! Menunggu konfirmasi penjual.'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                            } else {
+                              // Error
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '❌ ${transactionProvider.error ?? "Gagal memproses pembelian"}',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                  duration: const Duration(seconds: 3),
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Beli Sekarang'),
+                );
+              },
+            ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Helpers.showSnackbar(
-                context,
-                'Fitur pembelian akan segera hadir!',
-              );
-            },
-            child: const Text('Lanjutkan'),
-          ),
-        ],
-      ),
-    );
-  }
+        );
+      },
+    ),
+  );
+}
 
   void _showDeleteConfirmation(BuildContext context, int id) {
     showDialog(

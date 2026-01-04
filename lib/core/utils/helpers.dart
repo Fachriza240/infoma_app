@@ -12,14 +12,38 @@ class Helpers {
     return formatter.format(amount);
   }
 
-  // Format Date
+  // 🔧 FIXED: Format Date with fallback
   static String formatDate(DateTime date) {
-    return DateFormat('dd MMM yyyy', 'id_ID').format(date);
+    try {
+      return DateFormat('dd MMM yyyy', 'id_ID').format(date);
+    } catch (e) {
+      // Fallback to manual formatting if locale fails
+      final months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      ];
+      return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
+    }
   }
 
-  // Format DateTime
+  // 🔧 FIXED: Format DateTime with fallback
   static String formatDateTime(DateTime dateTime) {
-    return DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(dateTime);
+    try {
+      return DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(dateTime);
+    } catch (e) {
+      // Fallback to manual formatting if locale fails
+      final months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      ];
+      final day = dateTime.day.toString().padLeft(2, '0');
+      final month = months[dateTime.month - 1];
+      final year = dateTime.year;
+      final hour = dateTime.hour.toString().padLeft(2, '0');
+      final minute = dateTime.minute.toString().padLeft(2, '0');
+      
+      return '$day $month $year, $hour:$minute';
+    }
   }
 
   // Show Snackbar

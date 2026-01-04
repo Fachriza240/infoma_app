@@ -19,8 +19,9 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2, // ⚠️ VERSION NAIK dari 1 ke 2
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -126,7 +127,52 @@ class DatabaseHelper {
       )
     ''');
 
-    print('✅ Database tables created successfully');
+    // 🆕 Transactions Table
+    await db.execute('''
+      CREATE TABLE transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        seller_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        total_price REAL NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        buyer_notes TEXT,
+        seller_notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (product_id) REFERENCES marketplace (id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users (id) ON DELETE CASCADE,
+        FOREIGN KEY (seller_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
+
+    print('✅ Database tables created successfully (including transactions)');
+  }
+
+  // 🆕 Handle database upgrade (untuk existing users)
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+        CREATE TABLE transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          buyer_id INTEGER NOT NULL,
+          seller_id INTEGER NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 1,
+          total_price REAL NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          buyer_notes TEXT,
+          seller_notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (product_id) REFERENCES marketplace (id) ON DELETE CASCADE,
+          FOREIGN KEY (buyer_id) REFERENCES users (id) ON DELETE CASCADE,
+          FOREIGN KEY (seller_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+      print('✅ Transactions table added via migration');
+    }
   }
 
   // Generic CRUD Operations
@@ -185,6 +231,41 @@ class DatabaseHelper {
     );
   }
 
+  // 🆕 Query with JOIN (untuk transactions dengan product details)
+Future<List<Map<String, dynamic>>> queryTransactionsWithProduct(
+  String where,
+  List<dynamic> whereArgs,
+) async {
+  final db = await database;
+  return await db.rawQuery('''
+    SELECT 
+      t.id AS id,
+      t.product_id AS product_id,
+      t.buyer_id AS buyer_id,
+      t.seller_id AS seller_id,
+      t.quantity AS quantity,
+      t.total_price AS total_price,
+      t.status AS status,
+      t.buyer_notes AS buyer_notes,
+      t.seller_notes AS seller_notes,
+      t.created_at AS created_at,
+      t.updated_at AS updated_at,
+      m.name AS product_name,
+      m.price AS product_price,
+      m.images AS product_images,
+      m.condition AS product_condition,
+      b.name AS buyer_name,
+      b.phone AS buyer_phone,
+      s.name AS seller_name
+    FROM transactions t
+    LEFT JOIN marketplace m ON t.product_id = m.id
+    LEFT JOIN users b ON t.buyer_id = b.id
+    LEFT JOIN users s ON t.seller_id = s.id
+    WHERE $where
+    ORDER BY t.created_at DESC
+  ''', whereArgs);
+}
+
   // Close database
   Future<void> close() async {
     final db = await database;
@@ -196,7 +277,8 @@ class DatabaseHelper {
     final db = await database;
     await db.delete('residences');
     await db.delete('activities');
-    await db.delete('products');
+    await db.delete('marketplace');
+    await db.delete('transactions');
     print('🗑️ All data cleared');
   }
 
@@ -210,13 +292,17 @@ class DatabaseHelper {
       await db.rawQuery('SELECT COUNT(*) FROM activities'),
     );
     final productsCount = Sqflite.firstIntValue(
-      await db.rawQuery('SELECT COUNT(*) FROM products'),
+      await db.rawQuery('SELECT COUNT(*) FROM marketplace'),
+    );
+    final transactionsCount = Sqflite.firstIntValue(
+      await db.rawQuery('SELECT COUNT(*) FROM transactions'),
     );
 
     return {
       'residences': residencesCount ?? 0,
       'activities': activitiesCount ?? 0,
       'products': productsCount ?? 0,
+      'transactions': transactionsCount ?? 0,
     };
   }
 }
