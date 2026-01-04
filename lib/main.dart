@@ -12,6 +12,7 @@ import 'providers/marketplace_provider.dart';
 import 'screens/splash/splash_screen.dart';
 import 'providers/profile_provider.dart';
 import 'providers/bookmark_provider.dart';
+import 'providers/transaction_provider.dart'; // 🆕 IMPORT BARU
 
 void main() async {
   // Ensure Flutter is initialized
@@ -55,14 +56,19 @@ class MyApp extends StatelessWidget {
           create: (_) => AuthProvider(),
         ),
 
-        // Profile Provider - NEW!
+        // Profile Provider
         ChangeNotifierProvider(
           create: (_) => ProfileProvider(),
         ),
 
-        // Bookmark Provider - NEW!
+        // Bookmark Provider
         ChangeNotifierProvider(
           create: (_) => BookmarkProvider(),
+        ),
+
+        // 🆕 Transaction Provider - NEW!
+        ChangeNotifierProvider(
+          create: (_) => TransactionProvider(),
         ),
 
         // Residence Provider - SQLite

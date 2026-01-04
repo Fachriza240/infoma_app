@@ -1,216 +1,183 @@
 class TransactionModel {
-  final int id;
-  final String transactionCode;
+  final int? id;
+  final int productId;
   final int buyerId;
   final int sellerId;
-  final int productId;
   final int quantity;
-  final double unitPrice;
-  final double totalAmount;
-  final String buyerName;
-  final String buyerPhone;
-  final String buyerAddress;
-  final String pickupMethod; // 'pickup', 'delivery', 'meetup'
-  final String? pickupAddress;
-  final String? pickupNotes;
-  final String
-      status; // 'pending', 'confirmed', 'in_progress', 'completed', 'cancelled', 'refunded'
-  final String? paymentMethod;
-  final String paymentStatus; // 'pending', 'paid', 'failed', 'refunded'
-  final String? paymentProof;
+  final double totalPrice;
+  final String status; // pending, accepted, rejected
+  final String? buyerNotes;
   final String? sellerNotes;
-  final String? cancellationReason;
-  final DateTime? completedAt;
-  final DateTime? cancelledAt;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
-  // Computed properties
-  bool get isPending => status == 'pending';
-  bool get isConfirmed => status == 'confirmed';
-  bool get isInProgress => status == 'in_progress';
-  bool get isCompleted => status == 'completed';
-  bool get isCancelled => status == 'cancelled';
+  // 🆕 Extra fields dari JOIN query (tidak disimpan di database)
+  final String? productName;
+  final double? productPrice;
+  final String? productImages;
+  final String? productCondition;
+  final String? buyerName;
+  final String? buyerPhone;
+  final String? sellerName;
 
-  bool get isPaid => paymentStatus == 'paid';
-  bool get isPaymentPending => paymentStatus == 'pending';
+  TransactionModel({
+    this.id,
+    required this.productId,
+    required this.buyerId,
+    required this.sellerId,
+    required this.quantity,
+    required this.totalPrice,
+    this.status = 'pending',
+    this.buyerNotes,
+    this.sellerNotes,
+    required this.createdAt,
+    required this.updatedAt,
+    // Extra fields
+    this.productName,
+    this.productPrice,
+    this.productImages,
+    this.productCondition,
+    this.buyerName,
+    this.buyerPhone,
+    this.sellerName,
+  });
 
+  // 🔹 toDatabase - untuk INSERT/UPDATE
+  Map<String, dynamic> toDatabase() {
+    return {
+      if (id != null) 'id': id,
+      'product_id': productId,
+      'buyer_id': buyerId,
+      'seller_id': sellerId,
+      'quantity': quantity,
+      'total_price': totalPrice,
+      'status': status,
+      'buyer_notes': buyerNotes,
+      'seller_notes': sellerNotes,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
+  // 🔹 fromDatabase - dari SQLite (basic query)
+  factory TransactionModel.fromDatabase(Map<String, dynamic> map) {
+    return TransactionModel(
+      id: map['id'] as int?,
+      productId: map['product_id'] as int,
+      buyerId: map['buyer_id'] as int,
+      sellerId: map['seller_id'] as int,
+      quantity: map['quantity'] as int,
+      totalPrice: (map['total_price'] as num).toDouble(),
+      status: map['status'] as String,
+      buyerNotes: map['buyer_notes'] as String?,
+      sellerNotes: map['seller_notes'] as String?,
+      createdAt: DateTime.parse(map['created_at'] as String),
+      updatedAt: DateTime.parse(map['updated_at'] as String),
+    );
+  }
+
+  // 🔹 fromJoinQuery - dari JOIN query (dengan product & user details)
+  factory TransactionModel.fromJoinQuery(Map<String, dynamic> map) {
+    return TransactionModel(
+      id: map['id'] as int?,
+      productId: map['product_id'] as int,
+      buyerId: map['buyer_id'] as int,
+      sellerId: map['seller_id'] as int,
+      quantity: map['quantity'] as int,
+      totalPrice: (map['total_price'] as num).toDouble(),
+      status: map['status'] as String,
+      buyerNotes: map['buyer_notes'] as String?,
+      sellerNotes: map['seller_notes'] as String?,
+      createdAt: DateTime.parse(map['created_at'] as String),
+      updatedAt: DateTime.parse(map['updated_at'] as String),
+      // Extra fields dari JOIN
+      productName: map['product_name'] as String?,
+      productPrice: map['product_price'] != null 
+          ? (map['product_price'] as num).toDouble() 
+          : null,
+      productImages: map['product_images'] as String?,
+      productCondition: map['product_condition'] as String?,
+      buyerName: map['buyer_name'] as String?,
+      buyerPhone: map['buyer_phone'] as String?,
+      sellerName: map['seller_name'] as String?,
+    );
+  }
+
+  // 🔹 copyWith - untuk update status
+  TransactionModel copyWith({
+    int? id,
+    int? productId,
+    int? buyerId,
+    int? sellerId,
+    int? quantity,
+    double? totalPrice,
+    String? status,
+    String? buyerNotes,
+    String? sellerNotes,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? productName,
+    double? productPrice,
+    String? productImages,
+    String? productCondition,
+    String? buyerName,
+    String? buyerPhone,
+    String? sellerName,
+  }) {
+    return TransactionModel(
+      id: id ?? this.id,
+      productId: productId ?? this.productId,
+      buyerId: buyerId ?? this.buyerId,
+      sellerId: sellerId ?? this.sellerId,
+      quantity: quantity ?? this.quantity,
+      totalPrice: totalPrice ?? this.totalPrice,
+      status: status ?? this.status,
+      buyerNotes: buyerNotes ?? this.buyerNotes,
+      sellerNotes: sellerNotes ?? this.sellerNotes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      productName: productName ?? this.productName,
+      productPrice: productPrice ?? this.productPrice,
+      productImages: productImages ?? this.productImages,
+      productCondition: productCondition ?? this.productCondition,
+      buyerName: buyerName ?? this.buyerName,
+      buyerPhone: buyerPhone ?? this.buyerPhone,
+      sellerName: sellerName ?? this.sellerName,
+    );
+  }
+
+  // 🔹 Helper: Get first image URL
+  String? get firstImage {
+    if (productImages == null || productImages!.isEmpty) return null;
+    final imageList = productImages!.split(',');
+    return imageList.isNotEmpty ? imageList.first : null;
+  }
+
+  // 🔹 Helper: Status color
+  String get statusColor {
+    switch (status) {
+      case 'pending':
+        return 'warning'; // yellow
+      case 'accepted':
+        return 'success'; // green
+      case 'rejected':
+        return 'error'; // red
+      default:
+        return 'info'; // blue
+    }
+  }
+
+  // 🔹 Helper: Status label Indonesia
   String get statusLabel {
     switch (status) {
       case 'pending':
         return 'Menunggu Konfirmasi';
-      case 'confirmed':
-        return 'Dikonfirmasi';
-      case 'in_progress':
-        return 'Dalam Proses';
-      case 'completed':
-        return 'Selesai';
-      case 'cancelled':
-        return 'Dibatalkan';
-      case 'refunded':
-        return 'Dikembalikan';
+      case 'accepted':
+        return 'Diterima';
+      case 'rejected':
+        return 'Ditolak';
       default:
         return status;
     }
-  }
-
-  String get pickupMethodLabel {
-    switch (pickupMethod) {
-      case 'pickup':
-        return 'Ambil di Tempat';
-      case 'delivery':
-        return 'Diantar';
-      case 'meetup':
-        return 'COD / Ketemu';
-      default:
-        return pickupMethod;
-    }
-  }
-
-  TransactionModel({
-    required this.id,
-    required this.transactionCode,
-    required this.buyerId,
-    required this.sellerId,
-    required this.productId,
-    required this.quantity,
-    required this.unitPrice,
-    required this.totalAmount,
-    required this.buyerName,
-    required this.buyerPhone,
-    required this.buyerAddress,
-    required this.pickupMethod,
-    this.pickupAddress,
-    this.pickupNotes,
-    required this.status,
-    this.paymentMethod,
-    required this.paymentStatus,
-    this.paymentProof,
-    this.sellerNotes,
-    this.cancellationReason,
-    this.completedAt,
-    this.cancelledAt,
-    this.createdAt,
-    this.updatedAt,
-  });
-
-  factory TransactionModel.fromJson(Map<String, dynamic> json) {
-    return TransactionModel(
-      id: json['id'] ?? 0,
-      transactionCode: json['transaction_code'] ?? '',
-      buyerId: json['buyer_id'] ?? 0,
-      sellerId: json['seller_id'] ?? 0,
-      productId: json['product_id'] ?? 0,
-      quantity: json['quantity'] ?? 1,
-      unitPrice: json['unit_price'] != null
-          ? double.parse(json['unit_price'].toString())
-          : 0.0,
-      totalAmount: json['total_amount'] != null
-          ? double.parse(json['total_amount'].toString())
-          : 0.0,
-      buyerName: json['buyer_name'] ?? '',
-      buyerPhone: json['buyer_phone'] ?? '',
-      buyerAddress: json['buyer_address'] ?? '',
-      pickupMethod: json['pickup_method'] ?? 'pickup',
-      pickupAddress: json['pickup_address'],
-      pickupNotes: json['pickup_notes'],
-      status: json['status'] ?? 'pending',
-      paymentMethod: json['payment_method'],
-      paymentStatus: json['payment_status'] ?? 'pending',
-      paymentProof: json['payment_proof'],
-      sellerNotes: json['seller_notes'],
-      cancellationReason: json['cancellation_reason'],
-      completedAt: json['completed_at'] != null
-          ? DateTime.parse(json['completed_at'])
-          : null,
-      cancelledAt: json['cancelled_at'] != null
-          ? DateTime.parse(json['cancelled_at'])
-          : null,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'])
-          : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'transaction_code': transactionCode,
-      'buyer_id': buyerId,
-      'seller_id': sellerId,
-      'product_id': productId,
-      'quantity': quantity,
-      'unit_price': unitPrice,
-      'total_amount': totalAmount,
-      'buyer_name': buyerName,
-      'buyer_phone': buyerPhone,
-      'buyer_address': buyerAddress,
-      'pickup_method': pickupMethod,
-      'pickup_address': pickupAddress,
-      'pickup_notes': pickupNotes,
-      'status': status,
-      'payment_method': paymentMethod,
-      'payment_status': paymentStatus,
-      'payment_proof': paymentProof,
-      'seller_notes': sellerNotes,
-      'cancellation_reason': cancellationReason,
-      'completed_at': completedAt?.toIso8601String(),
-      'cancelled_at': cancelledAt?.toIso8601String(),
-      'created_at': createdAt?.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
-    };
-  }
-
-  Map<String, dynamic> toDatabase() {
-    return {
-      'id': id,
-      'transaction_code': transactionCode,
-      'buyer_id': buyerId,
-      'seller_id': sellerId,
-      'product_id': productId,
-      'quantity': quantity,
-      'unit_price': unitPrice,
-      'total_amount': totalAmount,
-      'buyer_name': buyerName,
-      'buyer_phone': buyerPhone,
-      'buyer_address': buyerAddress,
-      'pickup_method': pickupMethod,
-      'pickup_address': pickupAddress,
-      'pickup_notes': pickupNotes,
-      'status': status,
-      'payment_method': paymentMethod,
-      'payment_status': paymentStatus,
-      'created_at': createdAt?.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
-    };
-  }
-
-  factory TransactionModel.fromDatabase(Map<String, dynamic> map) {
-    return TransactionModel(
-      id: map['id'],
-      transactionCode: map['transaction_code'],
-      buyerId: map['buyer_id'],
-      sellerId: map['seller_id'],
-      productId: map['product_id'],
-      quantity: map['quantity'],
-      unitPrice: map['unit_price'],
-      totalAmount: map['total_amount'],
-      buyerName: map['buyer_name'],
-      buyerPhone: map['buyer_phone'],
-      buyerAddress: map['buyer_address'],
-      pickupMethod: map['pickup_method'],
-      pickupAddress: map['pickup_address'],
-      pickupNotes: map['pickup_notes'],
-      status: map['status'],
-      paymentMethod: map['payment_method'],
-      paymentStatus: map['payment_status'],
-      createdAt:
-          map['created_at'] != null ? DateTime.parse(map['created_at']) : null,
-      updatedAt:
-          map['updated_at'] != null ? DateTime.parse(map['updated_at']) : null,
-    );
   }
 }
