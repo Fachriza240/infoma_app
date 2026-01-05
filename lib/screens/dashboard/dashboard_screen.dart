@@ -5,10 +5,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/residence_provider.dart';
 import '../../providers/activity_provider.dart';
 import '../../providers/marketplace_provider.dart';
-import '../../providers/transaction_provider.dart'; // 🆕 IMPORT
-import '../transaction/my_transactions_screen.dart'; // 🆕 IMPORT
-import '../transaction/incoming_orders_screen.dart'; // 🆕 IMPORT
-import '../bookmark/my_bookmarks_screen.dart'; // Import existing
+import '../../providers/transaction_provider.dart';
+import '../../providers/booking_provider.dart'; // 🆕 IMPORT BARU
+import '../transaction/my_transactions_screen.dart';
+import '../transaction/incoming_orders_screen.dart';
+import '../bookmark/my_bookmarks_screen.dart';
+import '../booking/my_bookings_screen.dart'; // 🆕 IMPORT BARU
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -29,7 +31,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final residenceProvider = context.read<ResidenceProvider>();
     final activityProvider = context.read<ActivityProvider>();
     final marketplaceProvider = context.read<MarketplaceProvider>();
-    final transactionProvider = context.read<TransactionProvider>(); // 🆕
+    final transactionProvider = context.read<TransactionProvider>();
+    final bookingProvider = context.read<BookingProvider>(); // 🆕 NEW
     final authProvider = context.read<AuthProvider>();
 
     if (residenceProvider.residences.isEmpty) {
@@ -42,12 +45,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       await marketplaceProvider.fetchProducts();
     }
 
-    // 🆕 Load transactions based on role
+    // Load transactions based on role
     if (authProvider.user != null) {
       if (authProvider.isProvider) {
         await transactionProvider.fetchIncomingOrders(authProvider.user!.id);
+        // 🆕 Load incoming bookings for provider
+        await bookingProvider.fetchIncomingBookings(authProvider.user!.id);
       } else {
         await transactionProvider.fetchMyTransactions(authProvider.user!.id);
+        // 🆕 Load my bookings for student
+        await bookingProvider.fetchMyBookings(authProvider.user!.id);
       }
     }
   }
@@ -88,23 +95,39 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const SizedBox(height: 24),
 
       // Stats Cards
-      Consumer2<TransactionProvider, AuthProvider>(
-        builder: (context, transactionProvider, authProvider, _) {
+      Consumer3<TransactionProvider, BookingProvider, AuthProvider>(
+        builder:
+            (context, transactionProvider, bookingProvider, authProvider, _) {
           // Get transaction count
           final transactionCount = transactionProvider.transactions.length;
           final pendingCount = transactionProvider.getCountByStatus('pending');
+
+          // 🆕 Get booking count
+          final bookingCount = bookingProvider.bookings.length;
+          final pendingBookingCount = bookingProvider.pendingCount;
 
           return Column(
             children: [
               Row(
                 children: [
+                  // 🆕 CLICKABLE - Booking Card
                   Expanded(
                     child: _buildStatCard(
                       'Booking',
-                      '0',
+                      bookingCount.toString(),
                       Icons.home_work,
                       AppColors.primary,
-                      onTap: null, // Belum ada screen
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MyBookingsScreen(),
+                          ),
+                        );
+                      },
+                      badge: pendingBookingCount > 0
+                          ? pendingBookingCount.toString()
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -194,10 +217,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       const SizedBox(height: 24),
 
       // Stats Cards with REAL DATA
-      Consumer4<ResidenceProvider, ActivityProvider, MarketplaceProvider,
-          TransactionProvider>(
+      Consumer5<ResidenceProvider, ActivityProvider, MarketplaceProvider,
+          TransactionProvider, BookingProvider>(
         builder: (context, residenceProvider, activityProvider,
-            marketplaceProvider, transactionProvider, _) {
+            marketplaceProvider, transactionProvider, bookingProvider, _) {
           final userId = context.read<AuthProvider>().user?.id ?? 0;
 
           // Filter by provider ID
@@ -216,6 +239,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final pendingOrdersCount =
               transactionProvider.getCountByStatus('pending');
 
+          // 🆕 Get incoming bookings count
+          final incomingBookingsCount = bookingProvider.bookings.length;
+          final pendingBookingsCount = bookingProvider.pendingCount;
+
           return Column(
             children: [
               Row(
@@ -230,13 +257,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
+                  // 🆕 CLICKABLE - Booking Request Card
                   Expanded(
                     child: _buildStatCard(
-                      'Kegiatan',
-                      myActivities.toString(),
-                      Icons.event,
-                      AppColors.activityPrimary,
-                      onTap: null,
+                      'Booking',
+                      incomingBookingsCount.toString(),
+                      Icons.event_note,
+                      const Color(0xFF7C3AED), // Purple
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MyBookingsScreen(),
+                          ),
+                        );
+                      },
+                      badge: pendingBookingsCount > 0
+                          ? pendingBookingsCount.toString()
+                          : null,
                     ),
                   ),
                 ],
@@ -246,6 +284,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Expanded(
                     child: _buildStatCard(
+                      'Kegiatan',
+                      myActivities.toString(),
+                      Icons.event,
+                      AppColors.activityPrimary,
+                      onTap: null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
                       'Produk',
                       myProducts.toString(),
                       Icons.store,
@@ -253,7 +301,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       onTap: null,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
                   // 🆕 CLICKABLE - Pesanan Masuk Card
                   Expanded(
                     child: _buildStatCard(
@@ -274,6 +326,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           : null,
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(child: SizedBox()),
                 ],
               ),
             ],

@@ -19,7 +19,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2, // ⚠️ VERSION NAIK dari 1 ke 2
+      version: 3, // ⚠️ VERSION NAIK dari 2 ke 3 (untuk bookings table)
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -147,7 +147,30 @@ class DatabaseHelper {
       )
     ''');
 
-    print('✅ Database tables created successfully (including transactions)');
+    // 🆕 Bookings Table (untuk hunian booking)
+    await db.execute('''
+      CREATE TABLE bookings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        residence_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        provider_id INTEGER NOT NULL,
+        booking_code TEXT UNIQUE NOT NULL,
+        check_in_date TEXT NOT NULL,
+        check_out_date TEXT NOT NULL,
+        documents TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        rejection_reason TEXT,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (residence_id) REFERENCES residences (id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+        FOREIGN KEY (provider_id) REFERENCES users (id) ON DELETE CASCADE
+      )
+    ''');
+
+    print(
+        '✅ Database tables created successfully (including transactions and bookings)');
   }
 
   // 🆕 Handle database upgrade (untuk existing users)
@@ -172,6 +195,30 @@ class DatabaseHelper {
         )
       ''');
       print('✅ Transactions table added via migration');
+    }
+
+    if (oldVersion < 3) {
+      await db.execute('''
+        CREATE TABLE bookings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          residence_id INTEGER NOT NULL,
+          user_id INTEGER NOT NULL,
+          provider_id INTEGER NOT NULL,
+          booking_code TEXT UNIQUE NOT NULL,
+          check_in_date TEXT NOT NULL,
+          check_out_date TEXT NOT NULL,
+          documents TEXT,
+          status TEXT NOT NULL DEFAULT 'pending',
+          rejection_reason TEXT,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (residence_id) REFERENCES residences (id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+          FOREIGN KEY (provider_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+      print('✅ Bookings table added via migration');
     }
   }
 
@@ -232,12 +279,12 @@ class DatabaseHelper {
   }
 
   // 🆕 Query with JOIN (untuk transactions dengan product details)
-Future<List<Map<String, dynamic>>> queryTransactionsWithProduct(
-  String where,
-  List<dynamic> whereArgs,
-) async {
-  final db = await database;
-  return await db.rawQuery('''
+  Future<List<Map<String, dynamic>>> queryTransactionsWithProduct(
+    String where,
+    List<dynamic> whereArgs,
+  ) async {
+    final db = await database;
+    return await db.rawQuery('''
     SELECT 
       t.id AS id,
       t.product_id AS product_id,
@@ -264,7 +311,7 @@ Future<List<Map<String, dynamic>>> queryTransactionsWithProduct(
     WHERE $where
     ORDER BY t.created_at DESC
   ''', whereArgs);
-}
+  }
 
   // Close database
   Future<void> close() async {

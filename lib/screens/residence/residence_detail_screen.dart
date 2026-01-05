@@ -9,6 +9,8 @@ import 'residence_form_screen.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../providers/bookmark_provider.dart';
+import '../../providers/booking_provider.dart'; // 🆕 IMPORT BARU
+import '../booking/booking_form_screen.dart'; // 🆕 IMPORT BARU
 
 class ResidenceDetailScreen extends StatefulWidget {
   final int residenceId;
@@ -670,7 +672,22 @@ class _ResidenceDetailScreenState extends State<ResidenceDetailScreen> {
                                 .fetchResidenceById(widget.residenceId);
                           }
                         } else {
-                          _showBookingDialog(context, residence);
+                          // 🆕 Navigate to booking form
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BookingFormScreen(
+                                residence: residence,
+                              ),
+                            ),
+                          );
+
+                          // Refresh dashboard after booking
+                          if (mounted) {
+                            context.read<BookingProvider>().fetchMyBookings(
+                                  context.read<AuthProvider>().user!.id,
+                                );
+                          }
                         }
                       }
                     : null,
@@ -731,48 +748,6 @@ class _ResidenceDetailScreenState extends State<ResidenceDetailScreen> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showBookingDialog(BuildContext context, residence) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Booking Hunian'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Anda akan booking:'),
-            const SizedBox(height: 8),
-            Text(
-              residence.name,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text('Harga: ${Helpers.formatCurrency(residence.finalPrice)}'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Helpers.showSnackbar(
-                context,
-                'Fitur booking akan segera hadir!',
-              );
-            },
-            child: const Text('Lanjutkan'),
           ),
         ],
       ),
