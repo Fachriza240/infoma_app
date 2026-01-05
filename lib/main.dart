@@ -3,20 +3,25 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'dart:io' show Platform;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:intl/date_symbol_data_local.dart'; // 🆕 IMPORT BARU
 import 'core/themes/app_theme.dart';
 import 'data/local/shared_prefs_helper.dart';
 import 'providers/auth_provider.dart';
 import 'providers/residence_provider.dart';
 import 'providers/activity_provider.dart';
 import 'providers/marketplace_provider.dart';
+import 'providers/booking_provider.dart'; // 🆕 IMPORT BARU
 import 'screens/splash/splash_screen.dart';
 import 'providers/profile_provider.dart';
 import 'providers/bookmark_provider.dart';
-import 'providers/transaction_provider.dart'; // 🆕 IMPORT BARU
+import 'providers/transaction_provider.dart';
 
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 🆕 Initialize date formatting untuk Indonesian locale
+  await initializeDateFormatting('id_ID', null);
 
   // ✅ FIX: Initialize sqflite untuk Windows/Linux/macOS
   if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -64,6 +69,11 @@ class MyApp extends StatelessWidget {
         // Bookmark Provider
         ChangeNotifierProvider(
           create: (_) => BookmarkProvider(),
+        ),
+
+        // 🆕 Booking Provider - NEW!
+        ChangeNotifierProvider(
+          create: (_) => BookingProvider(),
         ),
 
         // 🆕 Transaction Provider - NEW!

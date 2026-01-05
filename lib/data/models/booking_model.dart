@@ -1,11 +1,11 @@
-import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class BookingModel {
-  final int id;
+  int id;
+  final int residenceId;
   final int userId;
-  final String
-      bookableType; // 'App\Models\Residence' atau 'App\Models\MarketplaceProduct'
-  final int bookableId;
+  final int providerId;
   final String bookingCode;
   final DateTime checkInDate;
   final DateTime checkOutDate;
@@ -24,8 +24,7 @@ class BookingModel {
   bool get isCompleted => status == 'completed';
   bool get isCancelled => status == 'cancelled';
 
-  bool get isResidence => bookableType.contains('Residence');
-  bool get isMarketplace => bookableType.contains('MarketplaceProduct');
+  int get durationDays => checkOutDate.difference(checkInDate).inDays;
 
   String get statusLabel {
     switch (status) {
@@ -44,11 +43,35 @@ class BookingModel {
     }
   }
 
+  Color get statusColor {
+    switch (status) {
+      case 'pending':
+        return const Color(0xFFFFA500); // Orange
+      case 'approved':
+        return const Color(0xFF4CAF50); // Green
+      case 'rejected':
+        return const Color(0xFFFF5252); // Red
+      case 'completed':
+        return const Color(0xFF2196F3); // Blue
+      case 'cancelled':
+        return const Color(0xFF9E9E9E); // Grey
+      default:
+        return const Color(0xFF9E9E9E);
+    }
+  }
+
+  String get formattedCheckIn =>
+      DateFormat('dd MMM yyyy', 'id_ID').format(checkInDate);
+  String get formattedCheckOut =>
+      DateFormat('dd MMM yyyy', 'id_ID').format(checkOutDate);
+  String get formattedCreatedAt => DateFormat('dd MMM yyyy HH:mm', 'id_ID')
+      .format(createdAt ?? DateTime.now());
+
   BookingModel({
-    required this.id,
+    this.id = 0,
+    required this.residenceId,
     required this.userId,
-    required this.bookableType,
-    required this.bookableId,
+    required this.providerId,
     required this.bookingCode,
     required this.checkInDate,
     required this.checkOutDate,
@@ -63,9 +86,9 @@ class BookingModel {
   factory BookingModel.fromJson(Map<String, dynamic> json) {
     return BookingModel(
       id: json['id'] ?? 0,
+      residenceId: json['residence_id'] ?? 0,
       userId: json['user_id'] ?? 0,
-      bookableType: json['bookable_type'] ?? '',
-      bookableId: json['bookable_id'] ?? 0,
+      providerId: json['provider_id'] ?? 0,
       bookingCode: json['booking_code'] ?? '',
       checkInDate: json['check_in_date'] != null
           ? DateTime.parse(json['check_in_date'])
@@ -74,7 +97,7 @@ class BookingModel {
           ? DateTime.parse(json['check_out_date'])
           : DateTime.now(),
       documents: json['documents'] is String
-          ? List<String>.from(jsonDecode(json['documents']))
+          ? (json['documents'] as String).split(',')
           : List<String>.from(json['documents'] ?? []),
       status: json['status'] ?? 'pending',
       rejectionReason: json['rejection_reason'],
@@ -91,13 +114,13 @@ class BookingModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'residence_id': residenceId,
       'user_id': userId,
-      'bookable_type': bookableType,
-      'bookable_id': bookableId,
+      'provider_id': providerId,
       'booking_code': bookingCode,
-      'check_in_date': checkInDate.toIso8601String().split('T')[0],
-      'check_out_date': checkOutDate.toIso8601String().split('T')[0],
-      'documents': jsonEncode(documents),
+      'check_in_date': DateFormat('yyyy-MM-dd').format(checkInDate),
+      'check_out_date': DateFormat('yyyy-MM-dd').format(checkOutDate),
+      'documents': documents.join(','),
       'status': status,
       'rejection_reason': rejectionReason,
       'notes': notes,
@@ -108,14 +131,13 @@ class BookingModel {
 
   Map<String, dynamic> toDatabase() {
     return {
-      'id': id,
+      'residence_id': residenceId,
       'user_id': userId,
-      'bookable_type': bookableType,
-      'bookable_id': bookableId,
+      'provider_id': providerId,
       'booking_code': bookingCode,
-      'check_in_date': checkInDate.toIso8601String().split('T')[0],
-      'check_out_date': checkOutDate.toIso8601String().split('T')[0],
-      'documents': jsonEncode(documents),
+      'check_in_date': DateFormat('yyyy-MM-dd').format(checkInDate),
+      'check_out_date': DateFormat('yyyy-MM-dd').format(checkOutDate),
+      'documents': documents.join(','),
       'status': status,
       'rejection_reason': rejectionReason,
       'notes': notes,
@@ -126,15 +148,15 @@ class BookingModel {
 
   factory BookingModel.fromDatabase(Map<String, dynamic> map) {
     return BookingModel(
-      id: map['id'],
-      userId: map['user_id'],
-      bookableType: map['bookable_type'],
-      bookableId: map['bookable_id'],
-      bookingCode: map['booking_code'],
+      id: map['id'] ?? 0,
+      residenceId: map['residence_id'] ?? 0,
+      userId: map['user_id'] ?? 0,
+      providerId: map['provider_id'] ?? 0,
+      bookingCode: map['booking_code'] ?? '',
       checkInDate: DateTime.parse(map['check_in_date']),
       checkOutDate: DateTime.parse(map['check_out_date']),
-      documents: List<String>.from(jsonDecode(map['documents'])),
-      status: map['status'],
+      documents: (map['documents'] as String).split(','),
+      status: map['status'] ?? 'pending',
       rejectionReason: map['rejection_reason'],
       notes: map['notes'],
       createdAt:
